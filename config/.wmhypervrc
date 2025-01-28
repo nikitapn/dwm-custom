@@ -1,0 +1,3 @@
+dwm_font = "JetBrainsMono NF:size=16:antialias=true:autohint=true"
+dmenu_font = "JetBrainsMono Nerd Font:size=16"
+st_font = "JetBrainsMono Nerd Font:style=Semibold:size=18"
