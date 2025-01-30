@@ -1396,6 +1396,20 @@ killclient(const Arg *arg)
 	}
 }
 
+static void get_window_position(Display *display, Window window, int *x, int *y, int *width, int *height) {
+    Window root;
+    int win_x, win_y;
+    unsigned int border_width, depth;
+
+    // Get window size
+    XGetGeometry(display, window, &root, &win_x, &win_y, (unsigned int *)width, (unsigned int *)height, &border_width, &depth);
+
+    // Get window position relative to root window
+    Window child;
+    XTranslateCoordinates(display, window, root, 0, 0, x, y, &child);
+}
+
+
 void
 manage(Window w, XWindowAttributes *wa)
 {
@@ -1440,8 +1454,8 @@ manage(Window w, XWindowAttributes *wa)
 	updatewmhints(c);
 	// always center a window in a floating mode
 	// if (selmon->sel && !selmon->sel->isfloating) {
-	c->x = c->mon->mx + (c->mon->mw - WIDTH(c)) / 2;
-	c->y = c->mon->my + (c->mon->mh - HEIGHT(c)) / 2;
+	c->x = c->mon->wx + (c->mon->ww - WIDTH(c)) / 2;
+	c->y = c->mon->wy + (c->mon->wh - HEIGHT(c)) / 2;
 	// }
 	XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
 	grabbuttons(c, 0);
@@ -1460,6 +1474,15 @@ manage(Window w, XWindowAttributes *wa)
 	c->mon->sel = c;
 	arrange(c->mon);
 	XMapWindow(dpy, c->win);
+
+	// center window again in case it's not resizable
+	int true_x, true_y, true_w, true_h;
+	get_window_position(dpy, w, &true_x, &true_y, &true_w, &true_h);
+	c->w = true_w; c->h = true_h;
+	c->x = c->mon->wx + (c->mon->ww - WIDTH(c)) / 2;
+	c->y = c->mon->wy + (c->mon->wh - HEIGHT(c)) / 2;
+	XMoveWindow(dpy, c->win, c->x, c->y);
+
 	if (term)
 		swallow(term, c);
 	focus(NULL);
