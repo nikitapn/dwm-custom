@@ -959,8 +959,8 @@ drawstatusbar(Monitor *m, int bh, char* stext, int stw) {
 		isCode = 0;
 	text = p;
 
-	w += 2; /* 1px padding on both sides */
-	ret = x = m->ww - w - stw;
+	// w += 2; /* 1px padding on both sides */
+	ret = x = m->ww - w - stw + 4;
 
 	drw_setscheme(drw, scheme[LENGTH(colors)]);
 	drw->scheme[ColFg] = scheme[SchemeNorm][ColFg];
@@ -1041,7 +1041,7 @@ drawbar(Monitor *m)
 	if (!m->showbar)
 		return;
 
-	if(showsystray && m == systraytomon(m) && !systrayonleft)
+	if(showsystray && m == systraytomon(m))
 		stw = getsystraywidth();
 
 	/* draw status first so it can be overdrawn by tags later */
@@ -1072,7 +1072,7 @@ drawbar(Monitor *m)
 
 	if ((w = m->ww - tw - x) > bh) {
 		if (m->sel) {
-			drw_setscheme(drw, scheme[m == selmon ? SchemeSel : SchemeNorm]);
+			drw_setscheme(drw, scheme[same_color_for_active_window ? SchemeNorm : (m == selmon ? SchemeSel : SchemeNorm)]);
 			drw_text(drw, x, 0, w, bh, lrpad / 2, m->sel->name, 0);
 			if (m->sel->isfloating)
 				drw_rect(drw, x + boxs, boxs, boxw, boxw, m->sel->isfixed, 0);
@@ -1453,10 +1453,10 @@ manage(Window w, XWindowAttributes *wa)
 	updatesizehints(c);
 	updatewmhints(c);
 	// always center a window in a floating mode
-	// if (selmon->sel && !selmon->sel->isfloating) {
+	//if (selmon->sel->isfloating || c->isfloating) {
 	c->x = c->mon->wx + (c->mon->ww - WIDTH(c)) / 2;
 	c->y = c->mon->wy + (c->mon->wh - HEIGHT(c)) / 2;
-	// }
+	//}
 	XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
 	grabbuttons(c, 0);
 	if (!c->isfloating)
@@ -1475,14 +1475,16 @@ manage(Window w, XWindowAttributes *wa)
 	arrange(c->mon);
 	XMapWindow(dpy, c->win);
 
-	// center window again in case it's not resizable
-	int true_x, true_y, true_w, true_h;
-	get_window_position(dpy, w, &true_x, &true_y, &true_w, &true_h);
-	c->w = true_w; c->h = true_h;
-	c->x = c->mon->wx + (c->mon->ww - WIDTH(c)) / 2;
-	c->y = c->mon->wy + (c->mon->wh - HEIGHT(c)) / 2;
-	XMoveWindow(dpy, c->win, c->x, c->y);
-
+	if (selmon->sel->isfloating || c->isfloating) {
+		// center window again in case it's not resizable
+		int true_x, true_y, true_w, true_h;
+		get_window_position(dpy, w, &true_x, &true_y, &true_w, &true_h);
+		// fprintf(stderr, "[%d, %d][%d,%d]", c->w, c->h, true_w, true_h);
+		c->w = true_w; c->h = true_h;
+		c->x = c->mon->wx + (c->mon->ww - WIDTH(c)) / 2;
+		c->y = c->mon->wy + (c->mon->wh - HEIGHT(c)) / 2;
+		XMoveWindow(dpy, c->win, c->x, c->y);
+	}
 	if (term)
 		swallow(term, c);
 	focus(NULL);
@@ -1743,7 +1745,7 @@ resize(Client *c, int x, int y, int w, int h, int interact)
 void
 resizebarwin(Monitor *m) {
 	unsigned int w = m->ww;
-	if (showsystray && m == systraytomon(m) && !systrayonleft)
+	if (showsystray && m == systraytomon(m))
 		w -= getsystraywidth();
 	XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, w, bh);
 }
@@ -2293,10 +2295,11 @@ altTabEnd()
 		}
 
 		/* restack clients */
-		for (int i = selmon->nTabs - 1;i >= 0;i--) {
-			focus(selmon->altsnext[i]);
-			restack(selmon);
-		}
+		// Commented out because it causes flickering after window is selected
+		// for (int i = selmon->nTabs - 1;i >= 0;i--) {
+		//	 focus(selmon->altsnext[i]);
+		//	 restack(selmon);
+		// }
 
 		free(selmon->altsnext); /* free list of clients */
 	}
@@ -2958,13 +2961,11 @@ updatesystray(void)
 	Client *i;
 	Monitor *m = systraytomon(NULL);
 	unsigned int x = m->mx + m->mw;
-	unsigned int sw = TEXTW(stext) - lrpad + systrayspacing;
 	unsigned int w = 1;
 
 	if (!showsystray)
 		return;
-	if (systrayonleft)
-		x -= sw + lrpad / 2;
+
 	if (!systray) {
 		/* init systray */
 		if (!(systray = (Systray *)calloc(1, sizeof(Systray))))
